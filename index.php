@@ -3,7 +3,7 @@
 // Initialize core
 $f3=require("lib/base.php");
 $f3->mset(array(
-	"UI" => "app/view/",
+	"UI" => "app/view/;app/plugin/",
 	"ESCAPE" => false,
 	"LOGS" => "log/",
 	"TEMP" => "tmp/",
@@ -64,6 +64,9 @@ $f3->set("db.instance", new DB\SQL(
 	$f3->get("db.pass")
 ));
 
+// Load final configuration
+\Model\Config::loadAll();
+
 // Ensure database is up to date
 $version = \Helper\Security::instance()->checkDatabaseVersion();
 if($version !== true) {
@@ -110,6 +113,10 @@ foreach($pluginDir as $pluginName) {
 	}
 }
 $f3->set("plugins", $plugins);
+
+// register filter
+\Helper\View::instance()->filter('parseText','$this->parseText');
+\Helper\View::instance()->filter('formatFilesize','$this->formatFilesize');
 
 // Set up user session
 $user = new Model\User();

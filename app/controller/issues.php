@@ -219,10 +219,10 @@ class Issues extends \Controller {
 							$issue->exists($i)
 							&& $i != "id"
 							&& $issue->$i != $val
-							&& !empty($val)
+							&& (!empty($val) || $val === "0")
 						) {
 							// Allow setting to Not Assigned
-							if($i == "owner_id" && $val == -1) {
+							if(($i == "owner_id" || $i == "sprint_id") && $val == -1) {
 								$val = null;
 							}
 							$issue->$i = $val;
@@ -440,11 +440,13 @@ class Issues extends \Controller {
 			return;
 		}
 
-		$status = new \Model\Issue\Status;
-		$status->load(array("closed = ?", 1));
-		$issue->status = $status->id;
-		$issue->closed_date = $this->now();
-		$issue->save();
+		if(!$issue->closed_date) {
+			$status = new \Model\Issue\Status;
+			$status->load(array("closed = ?", 1));
+			$issue->status = $status->id;
+			$issue->closed_date = $this->now();
+			$issue->save();
+		}
 
 		$f3->reroute("/issues/" . $issue->id);
 	}
@@ -458,11 +460,13 @@ class Issues extends \Controller {
 			return;
 		}
 
-		$status = new \Model\Issue\Status;
-		$status->load(array("closed = ?", 0));
-		$issue->status = $status->id;
-		$issue->closed_date = null;
-		$issue->save();
+		if($issue->closed_date) {
+			$status = new \Model\Issue\Status;
+			$status->load(array("closed = ?", 0));
+			$issue->status = $status->id;
+			$issue->closed_date = null;
+			$issue->save();
+		}
 
 		$f3->reroute("/issues/" . $issue->id);
 	}
@@ -570,47 +574,12 @@ class Issues extends \Controller {
 	}
 
 	/**
-	 * Save a newly created issue
+	 * Create a new issue from $_POST
 	 * @return Issue
 	 */
 	protected function _saveNew() {
 		$f3 = \Base::instance();
-		$post = array_map("trim", $f3->get("POST"));
-		$issue = new \Model\Issue;
-
-		// Set all supported issue fields
-		$issue->author_id = !empty($post["author_id"]) ? $post["author_id"] : $f3->get("user.id");
-		$issue->type_id = $post["type_id"];
-		$issue->created_date = $this->now();
-		$issue->name = $post["name"];
-		$issue->description = $post["description"];
-		$issue->priority = $post["priority"];
-		$issue->status = $post["status"];
-		$issue->owner_id = $post["owner_id"] ?: null;
-		$issue->hours_total = $post["hours_remaining"] ?: null;
-		$issue->hours_remaining = $post["hours_remaining"] ?: null;
-		$issue->repeat_cycle = in_array($post["repeat_cycle"], array("none", "")) ? null : $post["repeat_cycle"];
-		$issue->sprint_id = $post["sprint_id"];
-
-		if(!empty($post["due_date"])) {
-			$issue->due_date = date("Y-m-d", strtotime($post["due_date"]));
-
-			// Save to the sprint of the due date if a sprint was not specified
-			if(!$issue->sprint_id) {
-				$sprint = new \Model\Sprint();
-				$sprint->load(array("DATE(?) BETWEEN start_date AND end_date",$issue->due_date));
-				$issue->sprint_id = $sprint->id;
-			}
-		}
-		if(!empty($post["parent_id"])) {
-			$issue->parent_id = $post["parent_id"];
-		}
-
-		// Save issue, optionally send notifications
-		$notify = !empty($post["notify"]);
-		$issue->save($notify);
-
-		return $issue;
+		return \Model\Issue::create($f3->get("POST"), !!$f3->get("POST.notify"));
 	}
 
 	public function save($f3, $params) {
@@ -656,44 +625,6 @@ class Issues extends \Controller {
 		$post = $f3->get("POST");
 		if(!empty($post)) {
 			switch($post["action"]) {
-				case "comment":
-					$comment = new \Model\Issue\Comment;
-					if(empty($post["text"])) {
-						if($f3->get("AJAX")) {
-							$this->_printJson(array("error" => 1));
-						}
-						else {
-								$f3->reroute("/issues/" . $issue->id);
-						}
-						return;
-					}
-
-					$comment = new \Model\Issue\Comment();
-					$comment->user_id = $this->_userId;
-					$comment->issue_id = $issue->id;
-					$comment->text = $post["text"];
-					$comment->created_date = $this->now();
-					$comment->save();
-
-					$notification = \Helper\Notification::instance();
-					$notification->issue_comment($issue->id, $comment->id);
-
-					if($f3->get("AJAX")) {
-						$this->_printJson(
-							array(
-								"id" => $comment->id,
-								"text" => \Helper\View::instance()->parseText($comment->text, array("hashtags" => false)),
-								"date_formatted" => date("D, M j, Y \\a\\t g:ia", \Helper\View::instance()->utc2local(time())),
-								"user_name" => $f3->get('user.name'),
-								"user_username" => $f3->get('user.username'),
-								"user_email" => $f3->get('user.email'),
-								"user_email_md5" => md5(strtolower($f3->get('user.email'))),
-							)
-						);
-						return;
-					}
-					break;
-
 				case "add_watcher":
 					$watching = new \Model\Issue\Watcher;
 					// Loads just in case the user is already a watcher
@@ -714,8 +645,6 @@ class Issues extends \Controller {
 					if($f3->get("AJAX"))
 						return;
 					break;
-
-
 
 				case "add_dependency":
 					$dependencies = new \Model\Issue\Dependency;
@@ -743,7 +672,6 @@ class Issues extends \Controller {
 						return;
 					break;
 
-
 				case "remove_dependency":
 					$dependencies = new \Model\Issue\Dependency;
 					$dependencies->load($post["id"]);
@@ -752,7 +680,6 @@ class Issues extends \Controller {
 					if($f3->get("AJAX"))
 						return;
 					break;
-
 			}
 		}
 
@@ -831,29 +758,12 @@ class Issues extends \Controller {
 		$issue->load($params["id"]);
 
 		if($issue->id) {
-			$f3->set("issue", $issue);
+			$f3->set("parent", $issue);
+
 			$issues = new \Model\Issue\Detail;
-			if($f3->get("issue_type.project") == $issue->type_id || !$issue->parent_id) {
-				$searchparams = array("parent_id = ? AND deleted_date IS NULL", $issue->id);
-				$orderparams = array("order" => "status_closed, priority DESC, due_date");
-				$found_issues = $issues->find($searchparams, $orderparams);
-				$f3->set("issues", $found_issues);
-				$f3->set("parent", $issue);
-			} else {
-				if($issue->parent_id) {
-					$searchparams = array("(parent_id = ? OR parent_id = ?) AND parent_id IS NOT NULL AND parent_id <> 0 AND deleted_date IS NULL AND id <> ?", $issue->parent_id, $issue->id, $issue->id);
-					$orderparams = array('order' => "status_closed, priority DESC, due_date");
-					$found_issues = $issues->find($searchparams, $orderparams);
-
-					$f3->set("issues", $found_issues);
-
-					$parent = new \Model\Issue;
-					$parent->load($issue->parent_id);
-					$f3->set("parent", $parent);
-				} else {
-					$f3->set("issues", array());
-				}
-			}
+			$searchparams = array("parent_id = ? AND deleted_date IS NULL", $issue->id);
+			$orderparams = array("order" => "status_closed, priority DESC, due_date");
+			$f3->set("issues", $issues->find($searchparams, $orderparams));
 
 			$searchparams[0] = $searchparams[0]  . " AND status_closed = 0";
 			$openissues = $issues->count($searchparams);
@@ -896,8 +806,6 @@ class Issues extends \Controller {
 		} else {
 			$f3->error(404);
 		}
-
-
 	}
 
 	public function single_delete($f3, $params) {
@@ -921,6 +829,41 @@ class Issues extends \Controller {
 			$f3->reroute("/issues/{$issue->id}");
 		} else {
 			$f3->error(403);
+		}
+	}
+
+	public function comment_save($f3, $params) {
+		$post = $f3->get("POST");
+		if(empty($post["text"])) {
+			if($f3->get("AJAX")) {
+				$this->_printJson(array("error" => 1));
+			} else {
+				$f3->reroute("/issues/" . $post["issue_id"]);
+			}
+			return;
+		}
+
+		$comment = \Model\Issue\Comment::create(array(
+			"issue_id" => $post["issue_id"],
+			"user_id" => $this->_userId,
+			"text" => trim($post["text"])
+		));
+
+		if($f3->get("AJAX")) {
+			$this->_printJson(
+				array(
+					"id" => $comment->id,
+					"text" => \Helper\View::instance()->parseText($comment->text, array("hashtags" => false)),
+					"date_formatted" => date("D, M j, Y \\a\\t g:ia", \Helper\View::instance()->utc2local(time())),
+					"user_name" => $f3->get('user.name'),
+					"user_username" => $f3->get('user.username'),
+					"user_email" => $f3->get('user.email'),
+					"user_email_md5" => md5(strtolower($f3->get('user.email'))),
+				)
+			);
+			return;
+		} else {
+			$f3->reroute("/issues/" . $comment->issue_id);
 		}
 	}
 
@@ -1038,7 +981,7 @@ class Issues extends \Controller {
 
 			$notification = \Helper\Notification::instance();
 			$notification->issue_comment($issue->id, $comment->id);
-		} else {
+		} elseif($newfile->id) {
 			$notification = \Helper\Notification::instance();
 			$notification->issue_file($issue->id, $f3->get("file_id"));
 		}
@@ -1101,7 +1044,7 @@ class Issues extends \Controller {
 			if($issue->id) {
 				$f3 = \Base::instance();
 				$children = $issue->getChildren();
-				$hive = array("issue" => $issue, "children" => $children, "dict" => $f3->get("dict"), "site" => $f3->get("site"), "level" => $level, "issue_type" => $f3->get("issue_type"));
+				$hive = array("issue" => $issue, "children" => $children, "dict" => $f3->get("dict"), "BASE" => $f3->get("BASE"), "level" => $level, "issue_type" => $f3->get("issue_type"));
 				echo \Helper\View::instance()->render("issues/project/tree-item.html", "text/html", $hive);
 				if($children) {
 					foreach($children as $item) {
@@ -1128,4 +1071,43 @@ class Issues extends \Controller {
 
 	}
 
+	/**
+	 * Load all matching issues
+	 * @param  Base $f3
+	 */
+	public function parent_ajax($f3) {
+		if(!$f3->get("AJAX")) {
+			$f3->error(400);
+		}
+
+		$term = trim($f3->get('GET.q'));
+		$results = array();
+
+		$issue = new \Model\Issue;
+		if((substr($term, 0, 1) == '#') && is_numeric(substr($term, 1))) {
+			$id = (int) substr($term, 1);
+			$issues = $issue->find(array('id LIKE ?', $id. '%'), array('limit' => 20));
+
+			foreach($issues as $row) {
+				$results[] = array('id'=>$row->get('id'), 'text'=>$row->get('name'));
+			}
+		}
+		elseif(is_numeric($term)) {
+			$id = (int) $term;
+			$issues = $issue->find(array('(id LIKE ?) OR (name LIKE ?)', $id . '%', '%' . $id . '%'), array('limit' => 20));
+
+			foreach($issues as $row) {
+				$results[] = array('id'=>$row->get('id'), 'text'=>$row->get('name'));
+			}
+		}
+		else {
+			$issues = $issue->find(array('name LIKE ?', '%' . addslashes($term) . '%'), array('limit' => 20));
+
+			foreach($issues as $row) {
+				$results[] = array('id'=>$row->get('id'), 'text'=>$row->get('name'));
+			}
+		}
+
+		$this->_printJson(array('results' => $results));
+	}
 }

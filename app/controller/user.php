@@ -12,10 +12,11 @@ class User extends \Controller {
 		$this->_userId = $this->_requireLogin();
 		$this->_languages = array(
 			"en" => \ISO::LC_en,
-			"en_GB" => \ISO::LC_en . " (Great Britain)",
+			"en-GB" => \ISO::LC_en . " (Great Britain)",
 			"es" => \ISO::LC_es . " (Español)",
 			"pt" => \ISO::LC_pt . " (Português)",
 			"ru" => \ISO::LC_ru . " (Pу́сский)",
+			"nl" => \ISO::LC_nl . " (Nederlands)",
 		);
 	}
 
@@ -370,7 +371,7 @@ class User extends \Controller {
 			$renderTree = function(&$issue, $level = 0) use(&$renderTree) {
 				if(!empty($issue['id'])) {
 					$f3 = \Base::instance();
-					$hive = array("issue" => $issue, "dict" => $f3->get("dict"), "site" => $f3->get("site"), "level" => $level, "issue_type" => $f3->get("issue_type"));
+					$hive = array("issue" => $issue, "dict" => $f3->get("dict"), "BASE" => $f3->get("BASE"), "level" => $level, "issue_type" => $f3->get("issue_type"));
 					echo \Helper\View::instance()->render("issues/project/tree-item.html", "text/html", $hive);
 					if(!empty($issue['children'])) {
 						foreach($issue['children'] as $item) {

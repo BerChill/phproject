@@ -1,11 +1,11 @@
-<form class="form-horizontal well" role="form" action="{{ @site.url }}issues/save" method="post">
+<form class="form-horizontal well" role="form" action="{{ @BASE }}/issues/save" method="post">
 	<check if="{{ !empty(@issue) }}">
-		<a href="{{ @site.url }}issues/{{ @issue.id }}" class="close"><span aria-hidden="true">&times;</span><span class="sr-only">{{ @dict.close }}</span></a>
+		<a href="{{ @BASE }}/issues/{{ @issue.id }}" class="close"><span aria-hidden="true">&times;</span><span class="sr-only">{{ @dict.close }}</span></a>
 		<input type="hidden" name="id" value="{{ @issue.id }}">
 		<input type="hidden" name="hash_state" value="{{ json_encode(@issue->hashState()) | esc }}">
 	</check>
-	<legend>{{ (empty(@issue) ? @dict.new_n : @dict.edit_n), @type.name | format }}</legend>
 	<input type="hidden" name="type_id" value="{{ @type.id }}">
+	<h3>{{ (empty(@issue) ? @dict.new_n : @dict.edit_n), @type.name | format }}</h3>
 	<div class="row">
 		<div class="col-lg-6">
 
@@ -209,14 +209,14 @@
 		</div>
 		<div class="col-lg-6">
 			<div class="text-right">
-				<div class="checkbox checkbox-inline">
+				<div class="checkbox checkbox-container-inline">
 					<label>
 						<input type="checkbox" name="notify" value="1" checked>
 						{{ @dict.send_notifications }}
 					</label>
 				</div>&ensp;
 				<check if="{{ !empty(@issue) }}">
-					<a href="{{ @site.url }}issues/{{ @issue.id }}" class="btn btn-default btn-sm btn-cancel">{{ @dict.cancel }}</a>
+					<a href="{{ @BASE }}/issues/{{ @issue.id }}" class="btn btn-default btn-sm btn-cancel">{{ @dict.cancel }}</a>
 					<button type="reset" class="btn btn-default btn-sm">{{ @dict.reset }}</button>
 				</check>
 				<check if="{{ empty(@issue) }}">

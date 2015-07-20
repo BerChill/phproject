@@ -41,6 +41,56 @@ class Admin extends \Controller {
 		$this->_render("admin/index.html");
 	}
 
+	public function config($f3) {
+		$f3->set("title", $f3->get("dict.configuration"));
+		$this->_render("admin/config.html");
+	}
+
+	public function config_post_saveattribute($f3) {
+		$attribute = str_replace("-", ".", $f3->get("POST.attribute"));
+		$value = $f3->get("POST.value");
+		$response = array("error" => null);
+
+		if(!$attribute) {
+			$response["error"] = "No attribute specified.";
+			$this->_printJson($response);
+			return;
+		}
+
+		$config = new \Model\Config;
+		$config->load(array("attribute = ?", $attribute));
+
+		$config->attribute = $attribute;
+		switch($attribute) {
+			case "site-name":
+				if(trim($value)) {
+					$config->value = $value;
+					$config->save();
+				} else {
+					$response["error"] = "Site name cannot be empty.";
+				}
+				break;
+			case "site-timezone":
+				if(in_array($value, timezone_identifiers_list())) {
+					$config->value = $value;
+					$config->save();
+				} else {
+					$response["error"] = "Timezone is invalid.";
+				}
+				break;
+			default:
+				$config->value = $value;
+				$config->save();
+		}
+
+		if(!$response["error"]) {
+			$repsonse["attribute"] = $attribute;
+			$repsonse["value"] = $value;
+		}
+
+		$this->_printJson($response);
+	}
+
 	public function plugins($f3) {
 		$f3->set("title", $f3->get("dict.plugins"));
 		$this->_render("admin/plugins.html");
@@ -67,6 +117,15 @@ class Admin extends \Controller {
 		$this->_render("admin/users.html");
 	}
 
+	public function deleted_users($f3) {
+		$f3->set("title", $f3->get("dict.users"));
+
+		$users = new \Model\User();
+		$f3->set("users", $users->find("deleted_date IS NOT NULL AND role != 'group'"));
+
+		$this->_render("admin/users/deleted.html");
+	}
+
 	public function user_edit($f3, $params) {
 		$f3->set("title", $f3->get("dict.edit_user"));
 
@@ -88,13 +147,11 @@ class Admin extends \Controller {
 
 	public function user_new($f3) {
 		$f3->set("title", $f3->get("dict.new_user"));
-
 		$f3->set("rand_color", sprintf("#%02X%02X%02X", mt_rand(0, 0xFF), mt_rand(0, 0xFF), mt_rand(0, 0xFF)));
 		$this->_render("admin/users/edit.html");
 	}
 
 	public function user_save($f3) {
-
 		$security = \Helper\Security::instance();
 		$user = new \Model\User;
 
@@ -175,7 +232,41 @@ class Admin extends \Controller {
 	public function user_delete($f3, $params) {
 		$user = new \Model\User();
 		$user->load($params["id"]);
+		if(!$user->id) {
+			$f3->reroute("/admin/users");
+			return;
+		}
+
+		// Reassign issues if requested
+		if($f3->get("POST.reassign")) {
+			switch ($f3->get("POST.reassign")) {
+				case "unassign":
+					$user->reassignIssues(null);
+					break;
+				case "to-user":
+					$user->reassignIssues($f3->get("POST.reassign-to"));
+					break;
+			}
+		}
+
 		$user->delete();
+		if($f3->get("AJAX")) {
+			$this->_printJson(array("deleted" => 1));
+		} else {
+			$f3->reroute("/admin/users");
+		}
+	}
+
+	public function user_undelete($f3, $params) {
+		$user = new \Model\User();
+		$user->load($params["id"]);
+		if(!$user->id) {
+			$f3->reroute("/admin/users");
+			return;
+		}
+
+		$user->deleted_date = null;
+		$user->save();
 
 		if($f3->get("AJAX")) {
 			$this->_printJson(array("deleted" => 1));

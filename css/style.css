@@ -131,8 +131,10 @@ ol.issue-heading.breadcrumb {
 	line-height: 16px;
 }
 .comments,
-.comments > .media p,
-#history .media p,
+.comments > .media p.media-heading,
+.comments > .media p:last-child,
+#history .media p.media-heading,
+#history .media p:last-child,
 .comments .form-group:last-child {
 	margin-bottom: 0;
 }
@@ -182,7 +184,7 @@ select[multiple] {
 	text-decoration: line-through;
 }
 
-.form-horizontal .checkbox-inline {
+.form-horizontal .checkbox-container-inline {
 	display: inline-block;
 	padding-top: 5px;
 	margin-left: 10px;
@@ -283,6 +285,7 @@ table a.btn {
 	font-family: Menlo, Monaco, Consolas, "Courier New", monospace;
 	font-size: 11px;
 	overflow-x: auto;
+	white-space: pre;
 }
 
 /* Textile processed styles */
@@ -306,6 +309,13 @@ table a.btn {
 	padding: 0 0 0 5px;
 	margin-bottom: 5px;
 }
+.tex del {
+	opacity: 0.45;
+	transition: opacity .25s ease;
+}
+.tex del:hover {
+	opacity: 1;
+}
 
 .popover-content {
 	text-overflow: ellipsis;
@@ -316,6 +326,12 @@ table a.btn {
 .dropdown-menu {
 	max-height: 400px;
 	overflow-y: auto;
+}
+
+.dropdown-menu.datepicker {
+	overflow-y: visible;
+	font-size: 14px;
+	max-height: none;
 }
 
 .nowrap {
@@ -389,8 +405,8 @@ th[data-sort] {
 @media (min-width: 768px) and (max-width: 1200px) {
 	.navbar-nav > li:nth-last-child(n+5) > a,
 	.navbar-nav > li:nth-last-child(n+5) ~ li > a {
-		padding-left: 10px;
-		padding-right: 10px;
+		padding-left: 8px;
+		padding-right: 8px;
 	}
 }
 @media (min-width: 768px) and (max-width: 992px) {
@@ -410,4 +426,32 @@ th[data-sort] {
 	.navbar-form[role=search] .form-control:focus {
 		width: 165px;
 	}
+	.navbar-form[role=search] .btn {
+		display: none;
+	}
+}
+
+.twitter-typeahead {
+	display: block !important;
+}
+
+.twitter-typeahead .dropdown-menu {
+	min-width: 300px;
+	width: 100%;
+	padding: 0;
+}
+
+.twitter-typeahead .tt-suggestion {
+	padding: 6px 12px;
+	color: #404040;
+	font-size: 13px;
+}
+
+.twitter-typeahead .tt-suggestion:hover {
+	background-color: #00bc8c;
+	color: #fff;
+}
+
+.twitter-typeahead .tt-suggestion:hover .text-muted {
+	color: #eee;
 }

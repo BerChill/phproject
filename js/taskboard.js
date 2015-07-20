@@ -5,8 +5,8 @@ $(function() {
 });
 
 var Taskboard = {
-	updateURL: site_url + 'taskboard/edit', // AJAX Update Route (id is added dynamically)
-	addURL: site_url + 'taskboard/add', // AJAX Add Route
+	updateURL: BASE + '/taskboard/edit', // AJAX Update Route (id is added dynamically)
+	addURL: BASE + '/taskboard/add', // AJAX Add Route
 	taskReceived: false, // used for checking tasks resorted within the same list or to another
 	newTaskId: 0, // keep track of new tasks in case there are a few error tasks
 	init: function() {
@@ -119,7 +119,9 @@ var Taskboard = {
 		$("#task-dialog select#repeat_cycle").val(repeat_cycle);
 		$("#task-dialog input#dueDate").val(date);
 		$("#task-dialog").find("#dueDate").datepicker({
-			format: 'mm/dd/yyyy'
+			format: 'mm/dd/yyyy',
+			language: datepicker_language,
+			autoclose: true
 		});
 		Taskboard.setOptionByVal("#task-dialog", user);
 		Taskboard.setOptionByVal("#priority", priority);
@@ -137,7 +139,9 @@ var Taskboard = {
 		$("#task-dialog form").data("story-id", storyId);
 		$("#task-dialog").modal("show");
 		$("#task-dialog").find("#dueDate").datepicker({
-			format: 'mm/dd/yyyy'
+			format: 'mm/dd/yyyy',
+			language: datepicker_language,
+			autoclose: true
 		});
 	},
 	changeModalColor: function(userColor) {
